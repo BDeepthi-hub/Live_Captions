@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Live Speech Captions</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  #captions { border: 1px solid #ccc; padding: 10px; height: 150px; overflow-y: auto; font-size: 1.2em; background: #f9f9f9; }
+  button { font-size: 1em; margin: 5px; padding: 10px 15px; }
+  #micStatus { font-size: 1.5em; vertical-align: middle; }
+  #languageSelect { margin-left: 10px; font-size: 1em; }
+</style>
+</head>
+<body>
+
+<h2>Live Speech Captions</h2>
+
+<div>
+  <button id="startBtn">Start</button>
+  <button id="pauseBtn" disabled>Pause</button>
+  <button id="endBtn" disabled>End</button>
+
+  <span id="micStatus" title="Microphone status">🔴</span>
+
+  <select id="languageSelect" title="Select recognition language">
+    <option value="en-US">English (US)</option>
+    <option value="hi-IN">Hindi (India)</option>
+    <option value="fr-FR">French</option>
+    <option value="es-ES">Spanish</option>
+    <option value="de-DE">German</option>
+    <option value="ja-JP">Japanese</option>
+    <option value="zh-CN">Chinese (Simplified)</option>
+  </select>
+</div>
+
+<div id="captions" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const endBtn = document.getElementById('endBtn');
+  const micStatus = document.getElementById('micStatus');
+  const captions = document.getElementById('captions');
+  const languageSelect = document.getElementById('languageSelect');
+
+  let recognition;
+  let recognizing = false;
+  let paused = false;
+
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Your browser does not support Speech Recognition API. Please use Chrome or Edge.');
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function createRecognition() {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = languageSelect.value;
+
+    recognition.onstart = () => {
+      recognizing = true;
+      paused = false;
+      micStatus.textContent = '🟢';
+      micStatus.title = 'Microphone is active and listening';
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+      endBtn.disabled = false;
+      pauseBtn.textContent = 'Pause';
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+    };
+
+    recognition.onend = () => {
+      recognizing = false;
+      micStatus.textContent = '🔴';
+      micStatus.title = 'Microphone is inactive';
+      startBtn.disabled = false;
+      pauseBtn.disabled = true;
+      endBtn.disabled = true;
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + '\n';
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      captions.textContent = finalTranscript + interimTranscript;
+      captions.scrollTop = captions.scrollHeight;
+    };
+  }
+
+  startBtn.onclick = () => {
+    if (recognizing) return;
+    createRecognition();
+    recognition.start();
+  };
+
+  pauseBtn.onclick = () => {
+    if (!recognizing) return;
+    if (!paused) {
+      recognition.stop();
+      paused = true;
+      pauseBtn.textContent = 'Resume';
+      micStatus.textContent = '🟠';
+      micStatus.title = 'Microphone paused';
+    } else {
+      createRecognition();
+      recognition.start();
+      paused = false;
+      pauseBtn.textContent = 'Pause';
+      micStatus.textContent = '🟢';
+      micStatus.title = 'Microphone is active and listening';
+    }
+  };
+
+  endBtn.onclick = () => {
+    if (!recognizing) return;
+    recognition.stop();
+    paused = false;
+    captions.textContent += '\n--- Session ended ---\n';
+  };
+
+  languageSelect.onchange = () => {
+    if (recognizing) {
+      recognition.stop();
+      paused = false;
+      createRecognition();
+      recognition.start();
+    }
+  };
+</script>
+
+</body>
+</html>
